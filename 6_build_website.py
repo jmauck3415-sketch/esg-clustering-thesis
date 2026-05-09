@@ -2,16 +2,16 @@
 Step 6: Generate website data files.
 
 Creates:
-  docs/data.js      — all 430 companies as JS variables (file://-safe, no server needed)
-  docs/charts/      — copies of the 4 overview HTML charts
+  data.js      — all 430 companies as JS variables (file://-safe, no server needed)
+  charts/      — copies of the 4 overview HTML charts
 
-Run this once after any changes to esg_clustered.csv, then open docs/index.html.
+Run this once after any changes to esg_clustered.csv, then open index.html.
 """
 
 import json, shutil, os, math
 import pandas as pd
 
-os.makedirs("docs/charts", exist_ok=True)
+os.makedirs("charts", exist_ok=True)
 
 df = pd.read_csv("data/esg_clustered.csv")
 
@@ -107,18 +107,18 @@ stats_obj = {
     "n_companies": len(df),
 }
 
-with open("docs/data.js", "w", encoding="utf-8") as f:
+with open("data.js", "w", encoding="utf-8") as f:
     f.write("const ESG_DATA=")
     json.dump(records, f, separators=(",", ":"))
     f.write(";\nconst ESG_STATS=")
     json.dump(stats_obj, f, separators=(",", ":"))
     f.write(";\n")
 
-size_kb = os.path.getsize("docs/data.js") // 1024
-print(f"Saved docs/data.js  ({len(records)} companies, {size_kb} KB)")
+size_kb = os.path.getsize("data.js") // 1024
+print(f"Saved data.js  ({len(records)} companies, {size_kb} KB)")
 
 for fname in ["3d_scatter.html", "sector_heatmap.html", "cluster_boxplots.html", "silhouette_plotly.html"]:
-    shutil.copy(f"output/{fname}", f"docs/charts/{fname}")
-    print(f"Copied  output/{fname} -> docs/charts/{fname}")
+    shutil.copy(f"output/{fname}", f"charts/{fname}")
+    print(f"Copied  output/{fname} -> charts/{fname}")
 
-print("\nOpen docs/index.html in your browser.")
+print("\nOpen index.html in your browser.")
