@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S&P 500 ESG Risk Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="data.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1d3557;
+      --blue:   #457b9d;
+      --teal:   #2a9d8f;
+      --orange: #f4a261;
+      --red:    #e63946;
+      --bg:     #f1f3f5;
+      --card:   #ffffff;
+      --text:   #212529;
+      --muted:  #6c757d;
+      --border: #dee2e6;
+      --shadow: 0 1px 4px rgba(0,0,0,.10);
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 64px;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      white-space: nowrap;
+      letter-spacing: .02em;
+    }
+    header h1 span { color: #a8dadc; }
+
+    /* ── Search ── */
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 420px;
+    }
+    #search-input {
+      width: 100%;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 24px;
+      font-size: .95rem;
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      outline: none;
+      transition: background .2s;
+    }
+    #search-input::placeholder { color: rgba(255,255,255,.55); }
+    #search-input:focus { background: rgba(255,255,255,.25); }
+    #search-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0; right: 0;
+      background: var(--card);
+      border-radius: 10px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.18);
+      list-style: none;
+      overflow: hidden;
+      display: none;
+      max-height: 320px;
+      overflow-y: auto;
+      z-index: 200;
+    }
+    #search-dropdown.open { display: block; }
+    #search-dropdown li {
+      padding: 10px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-size: .9rem;
+      transition: background .15s;
+    }
+    #search-dropdown li:last-child { border-bottom: none; }
+    #search-dropdown li:hover, #search-dropdown li.active { background: #e9ecef; }
+    #search-dropdown li .ticker-tag {
+      font-weight: 700;
+      font-size: .8rem;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    #search-dropdown li .co-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #search-dropdown li .co-sector {
+      color: var(--muted);
+      font-size: .78rem;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* ── Main layout ── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+
+    /* ── Section headings ── */
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title .badge {
+      font-size: .72rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--blue);
+      color: #fff;
+      letter-spacing: .04em;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .chart-card { padding: 4px; }
+
+    /* ── Overview grid ── */
+    .overview-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 760px) { .overview-grid-2 { grid-template-columns: 1fr; } }
+
+    iframe {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      display: block;
+    }
+
+    /* ── Note banner ── */
+    .note {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: .83rem;
+      color: #664d03;
+      margin-bottom: 20px;
+    }
+
+    /* ── Profile section ── */
+    #profile-section {
+      margin-top: 36px;
+      display: none;
+    }
+    #profile-section.visible { display: block; }
+
+    /* ── Profile info cards ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .info-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+    .info-card .label {
+      font-size: .72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 5px;
+    }
+    .info-card .value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--navy);
+    }
+    .info-card .sub {
+      font-size: .75rem;
+      color: var(--muted);
+      font-weight: 400;
+      display: block;
+      margin-top: 2px;
+    }
+
+    /* ── Profile chart grid ── */
+    .profile-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 760px) { .profile-grid-2 { grid-template-columns: 1fr; } }
+
+    #radar-chart, #percentile-chart, #peers-chart {
+      width: 100%;
+      min-height: 380px;
+    }
+    #peers-chart { min-height: 420px; }
+
+    /* ── Company header ── */
+    #profile-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    #profile-header h2 {
+      font-size: 1.5rem;
+      color: var(--navy);
+    }
+    #profile-header .sub-head {
+      font-size: .95rem;
+      color: var(--muted);
+    }
+    #cluster-badge {
+      font-size: .8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #fff;
+    }
+
+    /* ── Placeholder ── */
+    .placeholder {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 1rem;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    .placeholder strong { color: var(--navy); font-size: 1.1rem; display: block; margin-bottom: 6px; }
+
+    /* ── Separator ── */
+    .sep { height: 24px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>S&amp;P 500 <span>ESG Risk Dashboard</span></h1>
+    <div class="search-wrap">
+      <input type="text" id="search-input" placeholder="Search by ticker or company name…" autocomplete="off">
+      <ul id="search-dropdown"></ul>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Overview ──────────────────────────────────────────────────── -->
+  <div class="section-title">
+    Cluster Overview
+    <span class="badge">430 companies · k=3 clusters</span>
+  </div>
+  <div class="note">
+    <strong>Note on scale:</strong> These are <strong>Sustainalytics ESG Risk Ratings</strong> —
+    lower scores = less ESG risk = better performance. This is the <em>inverse</em> of the
+    Refinitiv scale used in the replication paper (Sariyer &amp; Taşkın 2022).
+  </div>
+
+  <div class="overview-grid-2">
+    <div class="card chart-card">
+      <iframe src="charts/3d_scatter.html" height="480" title="3D ESG cluster scatter"></iframe>
+    </div>
+    <div class="card chart-card">
+      <iframe src="charts/silhouette_plotly.html" height="480" title="Silhouette scores"></iframe>
+    </div>
+  </div>
+
+  <div class="card chart-card" style="margin-bottom:16px">
+    <iframe src="charts/sector_heatmap.html" height="480" title="Sector heatmap"></iframe>
+  </div>
+
+  <div class="card chart-card">
+    <iframe src="charts/cluster_boxplots.html" height="480" title="Financial boxplots"></iframe>
+  </div>
+
+  <!-- ── Company Profile ────────────────────────────────────────────── -->
+  <div id="profile-section">
+    <div class="sep"></div>
+    <div class="section-title">
+      Company Profile
+      <span id="cluster-badge" class="badge"></span>
+    </div>
+
+    <div id="profile-header">
+      <h2 id="profile-title"></h2>
+      <span id="profile-subtitle" class="sub-head"></span>
+    </div>
+
+    <div class="info-grid" id="info-cards"></div>
+
+    <div class="profile-grid-2">
+      <div class="card chart-card"><div id="radar-chart"></div></div>
+      <div class="card chart-card"><div id="percentile-chart"></div></div>
+    </div>
+
+    <div class="card chart-card"><div id="peers-chart"></div></div>
+  </div>
+
+  <!-- Placeholder shown before any search -->
+  <div id="search-placeholder" class="placeholder" style="margin-top:32px">
+    <strong>Search for a company above</strong>
+    Type a ticker (e.g. AAPL) or company name to see its full ESG risk profile.
+  </div>
+
+</main>
+
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const CLUSTER_COLORS = {"1":"#f4a261","2":"#e63946","3":"#2a9d8f"};
+
+const RADAR_AXES = [
+  {key:"e_norm",            label:"Environmental\nRisk"},
+  {key:"s_norm",            label:"Social\nRisk"},
+  {key:"g_norm",            label:"Governance\nRisk"},
+  {key:"total_esg_norm",    label:"Total ESG\nRisk"},
+  {key:"controversy_norm",  label:"Controversy\nScore"},
+];
+
+const PCT_AXES = [
+  {key:"e_pct",           label:"Environmental Risk"},
+  {key:"s_pct",           label:"Social Risk"},
+  {key:"g_pct",           label:"Governance Risk"},
+  {key:"total_esg_pct",   label:"Total ESG Risk"},
+  {key:"controversy_pct", label:"Controversy Score"},
+];
+
+// ── Search ───────────────────────────────────────────────────────────────────
+const input    = document.getElementById("search-input");
+const dropdown = document.getElementById("search-dropdown");
+let activeIdx  = -1;
+
+function filterData(q) {
+  if (!q || q.length < 1) return [];
+  const ql = q.toLowerCase();
+  return ESG_DATA.filter(c =>
+    c.ticker.toLowerCase().startsWith(ql) ||
+    c.name.toLowerCase().includes(ql)
+  ).slice(0, 10);
+}
+
+function renderDropdown(results) {
+  dropdown.innerHTML = "";
+  activeIdx = -1;
+  if (!results.length) { dropdown.classList.remove("open"); return; }
+  results.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.dataset.ticker = c.ticker;
+    li.innerHTML = `
+      <span class="ticker-tag" style="background:${CLUSTER_COLORS[c.cluster]}">${c.ticker}</span>
+      <span class="co-name">${c.name}</span>
+      <span class="co-sector">${c.sector}</span>`;
+    li.addEventListener("click", () => selectCompany(c.ticker));
+    dropdown.appendChild(li);
+  });
+  dropdown.classList.add("open");
+}
+
+input.addEventListener("input", () => renderDropdown(filterData(input.value.trim())));
+
+input.addEventListener("keydown", e => {
+  const items = dropdown.querySelectorAll("li");
+  if (!items.length) return;
+  if (e.key === "ArrowDown") {
+    activeIdx = Math.min(activeIdx + 1, items.length - 1);
+  } else if (e.key === "ArrowUp") {
+    activeIdx = Math.max(activeIdx - 1, 0);
+  } else if (e.key === "Enter" && activeIdx >= 0) {
+    selectCompany(items[activeIdx].dataset.ticker);
+    return;
+  } else return;
+  items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+  e.preventDefault();
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".search-wrap")) dropdown.classList.remove("open");
+});
+
+// ── Select company ───────────────────────────────────────────────────────────
+function selectCompany(ticker) {
+  const company = ESG_DATA.find(c => c.ticker === ticker);
+  if (!company) return;
+  input.value = `${company.ticker} — ${company.name}`;
+  dropdown.classList.remove("open");
+  renderProfile(company);
+}
+
+// ── Render full profile ───────────────────────────────────────────────────────
+function renderProfile(company) {
+  const clusterKey = String(company.cluster);
+  const clusterInfo = ESG_STATS.clusters[clusterKey];
+
+  // Show section, hide placeholder
+  document.getElementById("profile-section").classList.add("visible");
+  document.getElementById("search-placeholder").style.display = "none";
+
+  // Header
+  document.getElementById("profile-title").textContent =
+    `${company.ticker} — ${company.name}`;
+  document.getElementById("profile-subtitle").textContent =
+    `${company.sector}  ·  ${company.industry}`;
+
+  const badge = document.getElementById("cluster-badge");
+  badge.textContent = clusterInfo.label;
+  badge.style.background = clusterInfo.color;
+
+  // Info cards
+  const roaStr  = company.roa  != null ? (company.roa * 100).toFixed(1) + "%" : "N/A";
+  const sizeStr = company.size_ln != null ? company.size_ln.toFixed(2) : "N/A";
+  document.getElementById("info-cards").innerHTML = `
+    <div class="info-card">
+      <div class="label">Total ESG Risk</div>
+      <div class="value">${company.total_esg.toFixed(1)}<span class="sub">lower = better</span></div>
+    </div>
+    <div class="info-card">
+      <div class="label">ESG Risk Level</div>
+      <div class="value">${company.esg_risk_level || "—"}</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Environmental Risk</div>
+      <div class="value">${company.e_score.toFixed(2)}</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Social Risk</div>
+      <div class="value">${company.s_score.toFixed(2)}</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Governance Risk</div>
+      <div class="value">${company.g_score.toFixed(2)}</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Controversy</div>
+      <div class="value">${company.controversy_level || "—"}<span class="sub">${company.controversy_score != null ? "Score: " + company.controversy_score : ""}</span></div>
+    </div>
+    <div class="info-card">
+      <div class="label">Return on Assets</div>
+      <div class="value">${roaStr}</div>
+    </div>
+    <div class="info-card">
+      <div class="label">Firm Size ln(Assets)</div>
+      <div class="value">${sizeStr}</div>
+    </div>`;
+
+  // Charts
+  renderRadar(company, clusterInfo);
+  renderPercentile(company);
+  renderPeers(company);
+
+  // Scroll to profile
+  document.getElementById("profile-section").scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+// ── Radar chart ───────────────────────────────────────────────────────────────
+function renderRadar(company, clusterInfo) {
+  const avg = ESG_STATS.average;
+
+  // Only include axes where company has a value
+  const axes = RADAR_AXES.filter(a => company[a.key] != null);
+  if (!axes.length) return;
+
+  const labels = axes.map(a => a.label);
+  const cLabels = [...labels, labels[0]];
+
+  function vals(src) {
+    const v = axes.map(a => src[a.key] ?? 5);
+    return [...v, v[0]];
+  }
+
+  const traces = [
+    {type:"scatterpolar", r:vals(avg),         theta:cLabels, fill:"none",
+     name:"S&P 500 Average", line:{color:"#adb5bd", dash:"dot",   width:2}},
+    {type:"scatterpolar", r:vals(clusterInfo), theta:cLabels, fill:"none",
+     name:clusterInfo.label, line:{color:clusterInfo.color, dash:"dash", width:2}},
+    {type:"scatterpolar", r:vals(company),     theta:cLabels, fill:"toself",
+     name:company.ticker,    line:{color:"#1d3557", width:2},
+     fillcolor:"rgba(29,53,87,0.15)"},
+  ];
+
+  const layout = {
+    polar: {radialaxis:{range:[0,10], tickfont:{size:9}}},
+    title: {text:`ESG Risk Profile: ${company.ticker}<br><sup>0–10 normalised · higher = more risk · smaller polygon = better</sup>`,
+            font:{size:14}},
+    legend:{orientation:"h", x:0.5, xanchor:"center", y:-0.18},
+    margin:{t:90, b:70, l:50, r:50},
+    paper_bgcolor:"rgba(0,0,0,0)",
+  };
+  Plotly.newPlot("radar-chart", traces, layout, {responsive:true, displayModeBar:false});
+}
+
+// ── Percentile chart ─────────────────────────────────────────────────────────
+function renderPercentile(company) {
+  const axes = PCT_AXES.filter(a => company[a.key] != null);
+  if (!axes.length) return;
+
+  const labels = axes.map(a => a.label).reverse();
+  const vals   = axes.map(a => company[a.key]).reverse();
+  const colors = vals.map(v => v > 66 ? "#e63946" : v > 33 ? "#f4a261" : "#2a9d8f");
+
+  const traces = [{
+    type:"bar", orientation:"h",
+    x: vals, y: labels,
+    marker:{color: colors},
+    text: vals.map(v => `${v.toFixed(0)}th pct`),
+    textposition:"inside",
+    insidetextanchor:"start",
+    hovertemplate:"%{y}: %{x:.1f}th percentile<extra></extra>",
+  }];
+
+  const layout = {
+    title:{text:`Risk Percentile Ranks: ${company.ticker}<br><sup>0 = lowest risk in sample · green &lt;33 · orange 33–66 · red &gt;66</sup>`,
+           font:{size:14}},
+    xaxis:{range:[0,105], title:"Percentile (0 = lowest risk, 100 = highest)"},
+    yaxis:{title:""},
+    shapes:[{type:"line", x0:50, x1:50, y0:-0.5, y1:axes.length-0.5,
+             line:{color:"#6c757d", dash:"dash", width:1.5}}],
+    annotations:[{x:50, y:axes.length-0.4, text:"Median", showarrow:false,
+                  font:{color:"#6c757d", size:11}}],
+    margin:{l:160, r:20, t:90, b:50},
+    paper_bgcolor:"rgba(0,0,0,0)",
+    plot_bgcolor:"rgba(0,0,0,0)",
+  };
+  Plotly.newPlot("percentile-chart", traces, layout, {responsive:true, displayModeBar:false});
+}
+
+// ── Sector peer scatter ───────────────────────────────────────────────────────
+function renderPeers(company) {
+  const peers  = ESG_DATA.filter(c => c.sector === company.sector);
+  const others = peers.filter(c => c.ticker !== company.ticker);
+
+  const traces = [];
+
+  // Group by cluster
+  [1,2,3].forEach(cl => {
+    const sub = others.filter(c => c.cluster === cl);
+    if (!sub.length) return;
+    const clInfo = ESG_STATS.clusters[String(cl)];
+    traces.push({
+      type:"scatter", mode:"markers",
+      x: sub.map(c => c.e_score),
+      y: sub.map(c => c.s_score),
+      name: clInfo.label,
+      marker:{color:clInfo.color, size:9, opacity:0.65},
+      customdata: sub.map(c => [c.ticker, c.name, c.total_esg]),
+      hovertemplate:"<b>%{customdata[0]}</b> — %{customdata[1]}<br>E: %{x:.2f} | S: %{y:.2f}<br>Total ESG: %{customdata[2]:.1f}<extra></extra>",
+    });
+  });
+
+  // Highlighted company
+  traces.push({
+    type:"scatter", mode:"markers+text",
+    x:[company.e_score], y:[company.s_score],
+    name:company.ticker,
+    marker:{color:"#1d3557", size:16, symbol:"star", line:{color:"white",width:1.5}},
+    text:[company.ticker], textposition:"top center",
+    textfont:{size:13, color:"#1d3557"},
+    hovertemplate:`<b>${company.ticker}</b> — ${company.name}<br>E: ${company.e_score.toFixed(2)} | S: ${company.s_score.toFixed(2)}<extra></extra>`,
+  });
+
+  const layout = {
+    title:{text:`${company.ticker} vs. ${company.sector} Sector Peers<br><sup>Environmental vs. Social Risk · lower = safer · star = selected company</sup>`,
+           font:{size:14}},
+    xaxis:{title:"Environmental Risk Score (lower = safer)"},
+    yaxis:{title:"Social Risk Score (lower = safer)"},
+    legend:{orientation:"h", x:0.5, xanchor:"center", y:-0.18},
+    margin:{t:90, b:80, l:70, r:20},
+    paper_bgcolor:"rgba(0,0,0,0)",
+    plot_bgcolor:"#fafafa",
+  };
+  Plotly.newPlot("peers-chart", traces, layout, {responsive:true, displayModeBar:false});
+}
+</script>
+
+</body>
+</html>
